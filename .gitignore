@@ -1,6 +1,5 @@
 # Dados
-data/raw/
-data/processed/
+data/
 
 # Python
 venv/
