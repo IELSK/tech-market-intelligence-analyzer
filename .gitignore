@@ -2,6 +2,12 @@
 data/processed
 data/raw
 
+# Modelos treinados (gerados pelo pipeline)
+models/artifacts/
+
+# Jupyter
+.ipynb_checkpoints/
+
 # Python
 venv/
 __pycache__/
