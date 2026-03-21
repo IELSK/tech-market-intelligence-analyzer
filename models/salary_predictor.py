@@ -21,31 +21,42 @@ print(f"Loaded dataset: {df.shape}")
 df = df.dropna(subset=["YearsCode", "DevType", "Country"])
 print(f"Shape after dropping NaN: {df.shape}")
 
-# Encode languages
-# Split language strings into lists
+# Encode languages 
 df["LanguageList"] = df["LanguageHaveWorkedWith"].str.split(";")
 df["LanguageList"] = df["LanguageList"].apply(
     lambda langs: [l.strip() for l in langs]
 )
 
-mlb = MultiLabelBinarizer()
+mlb_languages = MultiLabelBinarizer()
 language_encoded = pd.DataFrame(
-    mlb.fit_transform(df["LanguageList"]),
-    columns=mlb.classes_,
+    mlb_languages.fit_transform(df["LanguageList"]),
+    columns=mlb_languages.classes_,
     index=df.index,
 )
-print(f"Languages encoded: {len(mlb.classes_)} columns")
+print(f"Languages encoded: {len(mlb_languages.classes_)} columns")
 
-# Encode categorical features
-# DevType and Country are categorical — convert to numeric codes
-devtype_dummies = pd.get_dummies(df["DevType"], prefix="DevType")
+# Encode DevType
+# DevType also has multiple values separated by ";"
+df["DevTypeList"] = df["DevType"].str.split(";").apply(
+    lambda types: [t.strip() for t in types]
+)
+
+mlb_devtype = MultiLabelBinarizer()
+devtype_encoded = pd.DataFrame(
+    mlb_devtype.fit_transform(df["DevTypeList"]),
+    columns=mlb_devtype.classes_,
+    index=df.index,
+)
+print(f"Dev types encoded: {len(mlb_devtype.classes_)} columns")
+
+# Encode Country 
 df["Country_encoded"] = df["Country"].astype("category").cat.codes
 
 # Build feature matrix
 X = pd.concat(
     [
         df[["YearsCode", "Country_encoded"]].reset_index(drop=True),
-        devtype_dummies.reset_index(drop=True),
+        devtype_encoded.reset_index(drop=True),
         language_encoded.reset_index(drop=True),
     ],
     axis=1,
@@ -84,8 +95,8 @@ for name, model in models.items():
     print(f"  Saved to: {MODELS_DIR / f'{name}.pkl'}")
 
 # Save encoders
-joblib.dump(mlb, MODELS_DIR / "mlb.pkl")
-joblib.dump(devtype_dummies.columns.tolist(), MODELS_DIR / "devtype_columns.pkl")
+joblib.dump(mlb_languages, MODELS_DIR / "mlb_languages.pkl")
+joblib.dump(mlb_devtype, MODELS_DIR / "mlb_devtype.pkl")
 joblib.dump(df["Country"].astype("category").cat.categories.tolist(), MODELS_DIR / "country_categories.pkl")
 joblib.dump(X.columns.tolist(), MODELS_DIR / "feature_columns.pkl")
 print(f"\nEncoders saved to: {MODELS_DIR}")
