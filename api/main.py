@@ -19,6 +19,7 @@ feature_columns    = joblib.load(MODELS_DIR / "feature_columns.pkl")
 # Load analysis data
 language_metrics  = pd.read_parquet(DATA_ANALYSIS / "language_metrics.parquet")
 opportunity_index = pd.read_parquet(DATA_ANALYSIS / "opportunity_index.parquet")
+country_metrics = pd.read_parquet(DATA_ANALYSIS / "country_language_metrics.parquet")
 
 app = FastAPI(
     title="Tech Market Intelligence API",
@@ -46,6 +47,18 @@ def market_trends(limit: int = 10):
     """Returns languages ranked by opportunity index."""
     df = opportunity_index.sort_values("opportunity_index", ascending=False).head(limit)
     return df.to_dict(orient="records")
+
+@app.get("/country/{name}")
+def country_analysis(name: str, limit: int = 10):
+    """Returns top language opportunities for a specific country."""
+    df = country_metrics[
+        country_metrics["Country"].str.lower() == name.lower()
+    ]
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"Country '{name}' not found")
+
+    df_sorted = df.sort_values("opportunity_index", ascending=False).head(limit)
+    return df_sorted.to_dict(orient="records")
 
 
 @app.get("/language/{name}")
