@@ -68,6 +68,35 @@ def language_detail(name: str):
 
     return result
 
+@app.get("/yearly-trends")
+def yearly_trends():
+    """Returns language popularity per year for trend analysis."""
+    import sys
+    from pathlib import Path
+    sys.path.append(str(Path(__file__).parent.parent))
+    from config import DATA_PROCESSED
+
+    df = pd.read_parquet(DATA_PROCESSED / "dev_dataset.parquet")
+    total_per_year = df.groupby("year")["LanguageHaveWorkedWith"].count()
+
+    df_exploded = (
+        df.assign(Language=df["LanguageHaveWorkedWith"].str.split(";"))
+        .explode("Language")
+        .reset_index(drop=True)
+    )
+    df_exploded["Language"] = df_exploded["Language"].str.strip()
+
+    lang_year = (
+        df_exploded.groupby(["year", "Language"])["ConvertedCompYearly"]
+        .count()
+        .reset_index(name="count")
+    )
+    lang_year["popularity"] = lang_year.apply(
+        lambda row: row["count"] / total_per_year[row["year"]] * 100, axis=1
+    )
+
+    return lang_year[["year", "Language", "popularity"]].to_dict(orient="records")
+
 
 @app.post("/salary-prediction")
 def salary_prediction(data: SalaryPredictionInput):
