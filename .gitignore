@@ -1,6 +1,5 @@
 # Dados
-data/processed
-data/raw
+data
 
 # Modelos treinados (gerados pelo pipeline)
 models/artifacts/

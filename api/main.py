@@ -1,13 +1,16 @@
 import joblib
-import numpy as np
 import pandas as pd
 import sys
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI
 
 sys.path.append(str(Path(__file__).parent.parent))
-from config import DATA_ANALYSIS, MODELS_DIR
+from config import DATA_ANALYSIS, DATA_PROCESSED, MODELS_DIR
+from api.schemas import SalaryPredictionInput
+from api.routers.languages import init_router as init_languages
+from api.routers.trends import init_router as init_trends
+from api.routers.countries import init_router as init_countries
+from api.routers.prediction import init_router as init_prediction
 
 # Load models and encoders
 rf_model           = joblib.load(MODELS_DIR / "random_forest.pkl")
@@ -16,10 +19,11 @@ mlb_devtype        = joblib.load(MODELS_DIR / "mlb_devtype.pkl")
 country_categories = joblib.load(MODELS_DIR / "country_categories.pkl")
 feature_columns    = joblib.load(MODELS_DIR / "feature_columns.pkl")
 
-# Load analysis data
+# Load data 
+df_processed      = pd.read_parquet(DATA_PROCESSED / "dev_dataset.parquet")
 language_metrics  = pd.read_parquet(DATA_ANALYSIS / "language_metrics.parquet")
 opportunity_index = pd.read_parquet(DATA_ANALYSIS / "opportunity_index.parquet")
-country_metrics = pd.read_parquet(DATA_ANALYSIS / "country_language_metrics.parquet")
+country_metrics   = pd.read_parquet(DATA_ANALYSIS / "country_language_metrics.parquet")
 
 app = FastAPI(
     title="Tech Market Intelligence API",
@@ -27,144 +31,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Schemas
-class SalaryPredictionInput(BaseModel):
-    languages: list[str]
-    years_of_experience: float
-    country: str
-    dev_type: str
-
-# Routes
-@app.get("/top-languages")
-def top_languages(limit: int = 10):
-    """Returns top languages ranked by popularity."""
-    df = language_metrics.sort_values("popularity_pct", ascending=False).head(limit)
-    return df.to_dict(orient="records")
-
-
-@app.get("/market-trends")
-def market_trends(limit: int = 10):
-    """Returns languages ranked by opportunity index."""
-    df = opportunity_index.sort_values("opportunity_index", ascending=False).head(limit)
-    return df.to_dict(orient="records")
-
-@app.get("/country/{name}")
-def country_analysis(name: str, limit: int = 10):
-    """Returns top language opportunities for a specific country."""
-    df = country_metrics[
-        country_metrics["Country"].str.lower() == name.lower()
-    ]
-    if df.empty:
-        raise HTTPException(status_code=404, detail=f"Country '{name}' not found")
-
-    df_sorted = df.sort_values("opportunity_index", ascending=False).head(limit)
-    return df_sorted.to_dict(orient="records")
-
-
-@app.get("/language/{name}")
-def language_detail(name: str):
-    """Returns full details for a specific language."""
-    lang_row = language_metrics[
-        language_metrics["Language"].str.lower() == name.lower()
-    ]
-    if lang_row.empty:
-        raise HTTPException(status_code=404, detail=f"Language '{name}' not found")
-
-    result = lang_row.iloc[0].to_dict()
-
-    opp_row = opportunity_index[
-        opportunity_index["Language"].str.lower() == name.lower()
-    ]
-    if not opp_row.empty:
-        result["growth_factor"]     = opp_row.iloc[0]["growth_factor"]
-        result["opportunity_index"] = opp_row.iloc[0]["opportunity_index"]
-
-    return result
-
-@app.get("/yearly-trends")
-def yearly_trends():
-    """Returns language popularity per year for trend analysis."""
-    import sys
-    from pathlib import Path
-    sys.path.append(str(Path(__file__).parent.parent))
-    from config import DATA_PROCESSED
-
-    df = pd.read_parquet(DATA_PROCESSED / "dev_dataset.parquet")
-    total_per_year = df.groupby("year")["LanguageHaveWorkedWith"].count()
-
-    df_exploded = (
-        df.assign(Language=df["LanguageHaveWorkedWith"].str.split(";"))
-        .explode("Language")
-        .reset_index(drop=True)
-    )
-    df_exploded["Language"] = df_exploded["Language"].str.strip()
-
-    lang_year = (
-        df_exploded.groupby(["year", "Language"])["ConvertedCompYearly"]
-        .count()
-        .reset_index(name="count")
-    )
-    lang_year["popularity"] = lang_year.apply(
-        lambda row: row["count"] / total_per_year[row["year"]] * 100, axis=1
-    )
-
-    return lang_year[["year", "Language", "popularity"]].to_dict(orient="records")
-
-
-@app.post("/salary-prediction")
-def salary_prediction(data: SalaryPredictionInput):
-    """Predicts salary based on languages, experience, country and dev type."""
-
-    # Encode languages
-    lang_encoded = pd.DataFrame(
-        mlb_languages.transform([data.languages]),
-        columns=mlb_languages.classes_,
-    )
-
-    # Encode DevType
-    try:
-        devtype_encoded = pd.DataFrame(
-            mlb_devtype.transform([[data.dev_type]]),
-            columns=mlb_devtype.classes_,
-        )
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Unknown dev_type: '{data.dev_type}'")
-
-    # Encode Country
-    if data.country not in country_categories:
-        raise HTTPException(status_code=400, detail=f"Unknown country: '{data.country}'")
-    country_encoded = country_categories.index(data.country)
-
-    # Build feature row
-    input_df = pd.concat(
-        [
-            pd.DataFrame([[data.years_of_experience, country_encoded]], columns=["YearsCode", "Country_encoded"]),
-            devtype_encoded.reset_index(drop=True),
-            lang_encoded.reset_index(drop=True),
-        ],
-        axis=1,
-    )
-
-    # Ensure column order matches training
-    input_df = input_df.reindex(columns=feature_columns, fill_value=0)
-
-    # Predict 
-    predicted_salary = float(rf_model.predict(input_df)[0])
-
-    # Enrich response with market data
-    lang_data = []
-    for lang in data.languages:
-        row = language_metrics[language_metrics["Language"].str.lower() == lang.lower()]
-        if not row.empty:
-            entry = row.iloc[0].to_dict()
-            opp = opportunity_index[opportunity_index["Language"].str.lower() == lang.lower()]
-            if not opp.empty:
-                entry["growth_factor"]     = opp.iloc[0]["growth_factor"]
-                entry["opportunity_index"] = opp.iloc[0]["opportunity_index"]
-            lang_data.append(entry)
-
-    return {
-        "predicted_salary": round(predicted_salary, 2),
-        "input": data.model_dump(),
-        "language_market_data": lang_data,
-    }
+# Register routers 
+app.include_router(init_languages(language_metrics, opportunity_index))
+app.include_router(init_trends(opportunity_index, df_processed))
+app.include_router(init_countries(country_metrics))
+app.include_router(init_prediction(
+    rf_model, mlb_languages, mlb_devtype,
+    country_categories, feature_columns,
+    language_metrics, opportunity_index,
+))

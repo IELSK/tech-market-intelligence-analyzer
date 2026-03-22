@@ -94,7 +94,7 @@ lang_country_metrics = lang_country_metrics.merge(
     how="left",
 )
 
-# ── Opportunity index per country ─────────────────────────────────────────────
+# Opportunity index per country
 global_median_salary = df["ConvertedCompYearly"].median()
 
 MIN_POPULARITY  = 5.0

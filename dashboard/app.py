@@ -1,15 +1,24 @@
-import streamlit as st
+import joblib
 import pandas as pd
 import requests
-import plotly.express as px
-import joblib
+import streamlit as st
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+import os
 
 sys.path.append(str(Path(__file__).parent.parent))
 from config import MODELS_DIR
 
-API_URL = "http://localhost:8000"
+from tabs.popularity import render_popularity
+from tabs.opportunity import render_opportunity
+from tabs.trends import render_trends
+from tabs.prediction import render_prediction
+from tabs.countries import render_countries
+
+load_dotenv()
+API_URL              = os.getenv("API_URL", "http://localhost:8000")
+EXCHANGE_RATE_API_URL = os.getenv("EXCHANGE_RATE_API_URL", "https://api.exchangerate-api.com/v4/latest/USD")
 
 FEATURED_COUNTRIES_FLAGS = {
     "Brazil": "🇧🇷",
@@ -31,7 +40,7 @@ st.set_page_config(
     layout="wide",
 )
 
-# ── Fetch data ────────────────────────────────────────────────────────────────
+# Fetch data
 @st.cache_data(ttl=300)
 def fetch_top_languages(limit: int = 30):
     response = requests.get(f"{API_URL}/top-languages?limit={limit}")
@@ -56,7 +65,7 @@ def fetch_country_analysis(country: str, limit: int = 15):
 
 @st.cache_data(ttl=3600)
 def fetch_exchange_rates():
-    response = requests.get("https://api.exchangerate-api.com/v4/latest/USD")
+    response = requests.get(EXCHANGE_RATE_API_URL)
     return response.json()["rates"]
 
 @st.cache_data
@@ -77,7 +86,7 @@ except Exception:
     st.error("Could not connect to the API. Make sure it is running at http://localhost:8000")
     st.stop()
 
-# ── Header ────────────────────────────────────────────────────────────────────
+# Header
 st.title("🧠 Tech Market Intelligence")
 st.caption("Data sourced from Stack Overflow Developer Survey 2022–2025")
 
@@ -90,7 +99,7 @@ CURRENCIES = {
 selected_currency = st.selectbox("Currency", options=list(CURRENCIES.keys()), index=0)
 rate = CURRENCIES[selected_currency]
 
-# ── Tabs ──────────────────────────────────────────────────────────────────────
+# Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Popularity vs Salary",
     "🏆 Opportunity Ranking",
@@ -99,201 +108,17 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🌍 Country Analysis",
 ])
 
-# ── Tab 1: Popularity vs Salary ───────────────────────────────────────────────
 with tab1:
-    st.subheader("Popularity vs Median Salary")
-    st.caption("Bubble size represents number of developers")
+    render_popularity(df_languages, rate, selected_currency)
 
-    df_plot = df_languages.copy()
-    df_plot["median_salary"] = (df_plot["median_salary"] * rate).round(2)
-    df_plot["mean_salary"]   = (df_plot["mean_salary"] * rate).round(2)
-
-    fig = px.scatter(
-        df_plot,
-        x="popularity_pct",
-        y="median_salary",
-        size="developer_count",
-        text="Language",
-        labels={
-            "popularity_pct": "Popularity (%)",
-            "median_salary": f"Median Salary ({selected_currency})",
-        },
-        height=600,
-    )
-    fig.update_traces(textposition="top center")
-    fig.update_layout(showlegend=False)
-    st.plotly_chart(fig, width="stretch")
-
-# ── Tab 2: Opportunity Ranking ────────────────────────────────────────────────
 with tab2:
-    st.subheader("Language Opportunity Ranking")
-    st.caption("Based on salary, market presence and growth factor")
+    render_opportunity(df_trends, rate, selected_currency)
 
-    limit = st.slider("Number of languages", min_value=5, max_value=30, value=15)
-
-    df_top = df_trends.head(limit).copy()
-    df_top["median_salary"] = (df_top["median_salary"] * rate).round(2)
-    df_top_sorted = df_top.sort_values("opportunity_index")
-
-    fig = px.bar(
-        df_top_sorted,
-        x="opportunity_index",
-        y="Language",
-        orientation="h",
-        color="opportunity_index",
-        color_continuous_scale="Teal",
-        labels={"opportunity_index": "Opportunity Index"},
-        height=600,
-    )
-    fig.update_layout(showlegend=False, coloraxis_showscale=False)
-    st.plotly_chart(fig, width="stretch")
-
-    st.dataframe(
-        df_top[[
-            "Language", "popularity_pct", "median_salary", "growth_factor", "opportunity_index"
-        ]].reset_index(drop=True),
-        width="stretch",
-    )
-
-# ── Tab 3: Yearly Trends ──────────────────────────────────────────────────────
 with tab3:
-    st.subheader("Popularity Trend by Year")
-    st.caption("Evolution of language adoption from 2022 to 2025")
+    render_trends(df_yearly, df_languages)
 
-    top_languages = df_languages["Language"].head(15).tolist()
-    selected = st.multiselect(
-        "Select languages",
-        options=sorted(df_yearly["Language"].unique().tolist()),
-        default=top_languages[:5],
-    )
-
-    if selected:
-        df_filtered = df_yearly[df_yearly["Language"].isin(selected)]
-        fig = px.line(
-            df_filtered,
-            x="year",
-            y="popularity",
-            color="Language",
-            markers=True,
-            labels={
-                "year": "Year",
-                "popularity": "Popularity (%)",
-            },
-            height=500,
-        )
-        fig.update_xaxes(tickvals=[2022, 2023, 2024, 2025])
-        st.plotly_chart(fig, width="stretch")
-
-# ── Tab 4: Salary Prediction ──────────────────────────────────────────────────
 with tab4:
-    st.subheader("Salary Prediction")
-    st.caption("Predict your market salary based on your profile")
+    render_prediction(rate, selected_currency, API_URL, load_categories)
 
-    countries, dev_types, languages = load_categories()
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        selected_languages = st.multiselect("Languages", options=languages, default=["Python"])
-        selected_country   = st.selectbox("Country", options=countries)
-        selected_devtype   = st.selectbox("Dev Type", options=dev_types)
-        years_exp          = st.slider("Years of Experience", min_value=0, max_value=40, value=5)
-
-    with col2:
-        if st.button("Predict Salary", type="primary"):
-            if not selected_languages:
-                st.warning("Select at least one language.")
-            else:
-                payload = {
-                    "languages": selected_languages,
-                    "years_of_experience": years_exp,
-                    "country": selected_country,
-                    "dev_type": selected_devtype,
-                }
-                response = requests.post(f"{API_URL}/salary-prediction", json=payload)
-
-                if response.status_code == 200:
-                    data = response.json()
-                    predicted_converted = data["predicted_salary"] * rate
-                    st.metric("Predicted Salary", f"{selected_currency} {predicted_converted:,.0f}")
-
-                    st.subheader("Language Market Data")
-                    df_lang_data = pd.DataFrame(data["language_market_data"])
-                    if not df_lang_data.empty:
-                        df_lang_data["median_salary"] = (df_lang_data["median_salary"] * rate).round(2)
-                        df_lang_data["mean_salary"]   = (df_lang_data["mean_salary"] * rate).round(2)
-                        st.dataframe(
-                            df_lang_data[[
-                                "Language", "popularity_pct", "median_salary",
-                                "growth_factor", "opportunity_index"
-                            ]].reset_index(drop=True),
-                            width="stretch",
-                        )
-                else:
-                    st.error(f"Prediction error: {response.json().get('detail')}")
-
-# ── Tab 5: Country Analysis ───────────────────────────────────────────────────
 with tab5:
-    st.subheader("Country Analysis")
-    st.caption("Top language opportunities by country")
-
-    # Country selector with flags
-    country_options = [f"{flag} {name}" for name, flag in FEATURED_COUNTRIES_FLAGS.items()]
-    selected_option = st.selectbox("Select a country", options=country_options)
-
-    # Extract country name from selection
-    selected_country_name = selected_option.split(" ", 1)[1]
-
-    limit_country = st.slider("Number of languages", min_value=5, max_value=20, value=10, key="country_limit")
-
-    df_country = fetch_country_analysis(selected_country_name, limit=limit_country)
-
-    if not df_country.empty:
-        df_country_plot = df_country.copy()
-        df_country_plot["median_salary"] = (df_country_plot["median_salary"] * rate).round(2)
-        df_country_plot["mean_salary"]   = (df_country_plot["mean_salary"] * rate).round(2)
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown("**Opportunity Index**")
-            df_sorted = df_country_plot.sort_values("opportunity_index")
-            fig = px.bar(
-                df_sorted,
-                x="opportunity_index",
-                y="Language",
-                orientation="h",
-                color="opportunity_index",
-                color_continuous_scale="Teal",
-                labels={"opportunity_index": "Opportunity Index"},
-                height=450,
-            )
-            fig.update_layout(showlegend=False, coloraxis_showscale=False)
-            st.plotly_chart(fig, width="stretch")
-
-        with col2:
-            st.markdown("**Popularity vs Median Salary**")
-            fig = px.scatter(
-                df_country_plot,
-                x="popularity",
-                y="median_salary",
-                size="developer_count",
-                text="Language",
-                labels={
-                    "popularity": "Popularity (%)",
-                    "median_salary": f"Median Salary ({selected_currency})",
-                },
-                height=450,
-            )
-            fig.update_traces(textposition="top center")
-            fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, width="stretch")
-
-        st.dataframe(
-            df_country_plot[[
-                "Language", "popularity", "median_salary", "growth_factor", "opportunity_index"
-            ]].reset_index(drop=True),
-            width="stretch",
-        )
-    else:
-        st.warning("No data available for this country.")
+    render_countries(rate, selected_currency, API_URL, FEATURED_COUNTRIES_FLAGS, fetch_country_analysis)
