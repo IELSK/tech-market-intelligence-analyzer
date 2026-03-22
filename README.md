@@ -102,7 +102,7 @@ source venv/bin/activate     # macOS/Linux
 
 ### 3. Install dependencies
 ```bash
-pip install pandas numpy scikit-learn fastapi uvicorn streamlit plotly joblib pyarrow python-dotenv
+pip install -r requirements.txt
 ```
 
 ### 4. Download survey data
