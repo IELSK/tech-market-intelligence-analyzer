@@ -126,13 +126,25 @@ cp .env.example .env
 ```
 
 ### 6. Run the pipeline
+
+**Data ingestion and cleaning:**
 ```bash
 python pipeline/ingest_stackoverflow.py
+```
+
+**Analysis:**
+```bash
 python analysis/language_analysis.py
 python analysis/opportunity_index.py
 python analysis/country_analysis.py
+```
+
+**Model training:**
+```bash
 python models/salary_predictor.py
 ```
+
+Each step depends on the output of the previous one.
 
 ---
 
