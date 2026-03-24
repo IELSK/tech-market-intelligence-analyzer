@@ -1,15 +1,8 @@
-import joblib
 import pandas as pd
 import requests
 import streamlit as st
-import sys
-from pathlib import Path
 from dotenv import load_dotenv
 import os
-
-sys.path.append(str(Path(__file__).parent.parent))
-from config import MODELS_DIR
-
 from tabs.popularity import render_popularity
 from tabs.opportunity import render_opportunity
 from tabs.trends import render_trends
@@ -68,15 +61,12 @@ def fetch_exchange_rates():
     response = requests.get(EXCHANGE_RATE_API_URL)
     return response.json()["rates"]
 
-@st.cache_data
+@st.cache_data(ttl=300)
 def load_categories():
-    countries = joblib.load(MODELS_DIR / "country_categories.pkl")
-    mlb_dev   = joblib.load(MODELS_DIR / "mlb_devtype.pkl")
-    mlb_lang  = joblib.load(MODELS_DIR / "mlb_languages.pkl")
-    dev_types = sorted(mlb_dev.classes_.tolist())
-    languages = sorted(mlb_lang.classes_.tolist())
+    languages = requests.get(f"{API_URL}/available-languages").json()
+    dev_types = requests.get(f"{API_URL}/available-devtypes").json()
+    countries = requests.get(f"{API_URL}/available-countries").json()
     return countries, dev_types, languages
-
 try:
     df_languages = fetch_top_languages()
     df_trends    = fetch_market_trends()

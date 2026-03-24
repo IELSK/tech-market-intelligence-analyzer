@@ -6,6 +6,23 @@ router = APIRouter()
 
 def init_router(rf_model, mlb_languages, mlb_devtype, country_categories, feature_columns,
                 language_metrics: pd.DataFrame, opportunity_index: pd.DataFrame):
+    
+    @router.get("/available-languages")
+    def available_languages():
+        """Returns all languages known by the model."""
+        return sorted(mlb_languages.classes_.tolist())
+
+
+    @router.get("/available-devtypes")
+    def available_devtypes():
+        """Returns all dev types known by the model."""
+        return sorted(mlb_devtype.classes_.tolist())
+
+
+    @router.get("/available-countries")
+    def available_countries():
+        """Returns all countries known by the model."""
+        return sorted(country_categories)
 
     @router.post("/salary-prediction")
     def salary_prediction(data):

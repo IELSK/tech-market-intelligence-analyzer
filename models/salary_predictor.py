@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import sys
 from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -9,7 +8,7 @@ from sklearn.metrics import mean_absolute_error, r2_score
 import joblib
 
 sys.path.append(str(Path(__file__).parent.parent))
-from config import DATA_PROCESSED, DATA_ANALYSIS, MODELS_DIR
+from config import DATA_PROCESSED, MODELS_DIR
 
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -36,7 +35,6 @@ language_encoded = pd.DataFrame(
 print(f"Languages encoded: {len(mlb_languages.classes_)} columns")
 
 # Encode DevType
-# DevType also has multiple values separated by ";"
 df["DevTypeList"] = df["DevType"].str.split(";").apply(
     lambda types: [t.strip() for t in types]
 )
