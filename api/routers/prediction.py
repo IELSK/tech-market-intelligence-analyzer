@@ -1,6 +1,8 @@
 import pandas as pd
 from fastapi import APIRouter, HTTPException
 
+from api.schemas import SalaryPredictionInput
+
 router = APIRouter()
 
 
@@ -25,9 +27,8 @@ def init_router(rf_model, mlb_languages, mlb_devtype, country_categories, featur
         return sorted(country_categories)
 
     @router.post("/salary-prediction")
-    def salary_prediction(data):
+    def salary_prediction(data: SalaryPredictionInput):
         """Predicts salary based on languages, experience, country and dev type."""
-        from api.schemas import SalaryPredictionInput
 
         # Encode languages
         lang_encoded = pd.DataFrame(
