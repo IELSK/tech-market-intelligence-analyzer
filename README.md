@@ -75,7 +75,7 @@ tech-market-intelligence-analyzer/
 
 **Parquet over CSV** — preserves column types across pipeline stages and compresses significantly better. Avoids repeated type inference on every load.
 
-**Random Forest over Gradient Boosting** — both models produced nearly identical R² scores (0.47). Random Forest was selected for its lower MAE ($31,774 vs $33,083) and faster inference time, which matters for a real-time API endpoint.
+**Random Forest over Gradient Boosting** — both models produced nearly identical R² scores (0.4737 vs 0.4753). Random Forest was selected for its lower MAE ($32,235 vs $32,999) and faster inference time, which matters for a real-time API endpoint.
 
 **MultiLabelBinarizer for languages and DevType** — both columns contain semicolon-separated multiple values per respondent. Binarization preserves the multi-label nature of the data and avoids the ordering artifacts of ordinal encoding.
 
@@ -126,13 +126,25 @@ cp .env.example .env
 ```
 
 ### 6. Run the pipeline
+
+**Data ingestion and cleaning:**
 ```bash
 python pipeline/ingest_stackoverflow.py
+```
+
+**Analysis:**
+```bash
 python analysis/language_analysis.py
 python analysis/opportunity_index.py
 python analysis/country_analysis.py
+```
+
+**Model training:**
+```bash
 python models/salary_predictor.py
 ```
+
+Each step depends on the output of the previous one.
 
 ---
 

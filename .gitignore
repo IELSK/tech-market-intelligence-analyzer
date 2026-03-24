@@ -1,7 +1,7 @@
-# Dados
+# Data
 data
 
-# Modelos treinados (gerados pelo pipeline)
+# Trained models
 models/artifacts/
 
 # Jupyter
