@@ -181,22 +181,23 @@ API documentation is available at `http://localhost:8000/docs`.
 ## Screenshots
 
 > Dashboard — Popularity vs Salary
-> `[ screenshot placeholder ]`
+> <img width="1808" height="717" alt="Captura de tela 2026-03-25 122332" src="https://github.com/user-attachments/assets/dccb55ea-897a-429b-80d9-323b6103079c" />
+
 
 > Dashboard — Opportunity Ranking
-> `[ screenshot placeholder ]`
+> <img width="1833" height="805" alt="Captura de tela 2026-03-25 121922" src="https://github.com/user-attachments/assets/c294307d-69de-476d-8792-eec7c9771195" />
 
 > Dashboard — Yearly Trends
-> `[ screenshot placeholder ]`
+
+> <img width="1832" height="787" alt="Captura de tela 2026-03-25 121942" src="https://github.com/user-attachments/assets/e7730462-39d6-46cc-95af-7216f70452b9" />
 
 > Dashboard — Salary Prediction
-> `[ screenshot placeholder ]`
+> <img width="1823" height="589" alt="Captura de tela 2026-03-25 122014" src="https://github.com/user-attachments/assets/fce922f7-5e65-4cad-91c0-b8603d5e7e75" />
 
 > Dashboard — Country Analysis
-> `[ screenshot placeholder ]`
+> <img width="1823" height="761" alt="Captura de tela 2026-03-25 122031" src="https://github.com/user-attachments/assets/33b11eac-7cad-49fb-9c0c-873ce6bf2156" />
 
 ---
 
 ## Demo
-
-> `[ demo video placeholder ]`
+> 
